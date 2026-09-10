@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio Konverter Document ke Image</title>
+  
+  <!-- Font & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  
+  <!-- Dependency Utama & JQuery -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+  <!-- Pustaka Konversi MS Office -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptx2html@0.3.0/dist/pptx2html.min.js"></script>
+  
+  <style>
+    /* --- SKEMA WARNA & TEMA --- */
+    :root, [data-theme="dark"] {
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --saweria-color: #eab308;
+      --bg-gradient: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.85);
+      --nav-bg: #0f172a;
+      --sidebar-bg: #1e293b;
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: rgba(0, 0, 0, 0.25);
+    }
+
+    [data-theme="light"] {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --saweria-color: #d97706;
+      --bg-gradient: #f8fafc;
+      --card-bg: #ffffff;
+      --nav-bg: #ffffff;
+      --sidebar-bg: #f1f5f9;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --input-bg: #f1f5f9;
+    }
+
+    [data-theme="glass"] {
+      --primary: #ec4899;
+      --primary-hover: #db2777;
+      --saweria-color: #eab308;
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #31103f 100%);
+      --card-bg: rgba(255, 255, 255, 0.08);
+      --nav-bg: rgba(15, 23, 42, 0.6);
+      --sidebar-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.15);
+      --text-main: #ffffff;
+      --text-muted: #cbd5e1;
+      --input-bg: rgba(255, 255, 255, 0.05);
+    }
+
+    [data-theme="facebook"] {
+      --primary: #1877f2;
+      --primary-hover: #166fe5;
+      --saweria-color: #eab308;
+      --bg-gradient: #f0f2f5;
+      --card-bg: #ffffff;
+      --nav-bg: #ffffff;
+      --sidebar-bg: #ffffff;
+      --card-border: #ccd0d5;
+      --text-main: #1c1e21;
+      --text-muted: #606770;
+      --input-bg: #f0f2f5;
+    }
+
+    [data-theme="twitter"] {
+      --primary: #1d9bf0;
+      --primary-hover: #1a8cd8;
+      --saweria-color: #eab308;
+      --bg-gradient: #000000;
+      --card-bg: #15202b;
+      --nav-bg: #000000;
+      --sidebar-bg: #15202b;
+      --card-border: #38444d;
+      --text-main: #f7f9f9;
+      --text-muted: #8b98a5;
+      --input-bg: #202e3a;
+    }
+
+    [data-theme="instagram"] {
+      --primary: #e1306c;
+      --primary-hover: #c13584;
+      --saweria-color: #f77737;
+      --bg-gradient: #000000;
+      --card-bg: #121212;
+      --nav-bg: #000000;
+      --sidebar-bg: #121212;
+      --card-border: #262626;
+      --text-main: #f5f5f5;
+      --text-muted: #a8a8a8;
+      --input-bg: #262626;
+    }
+
+    [data-theme="whatsapp"] {
+      --primary: #25d366;
+      --primary-hover: #20bd5a;
+      --saweria-color: #eab308;
+      --bg-gradient: #0b141a;
+      --card-bg: #111b21;
+      --nav-bg: #202c33;
+      --sidebar-bg: #111b21;
+      --card-border: #222e35;
+      --text-main: #e9edef;
+      --text-muted: #8696a0;
+      --input-bg: #202c33;
+    }
+
+    [data-theme="telegram"] {
+      --primary: #2aabee;
+      --primary-hover: #229ed9;
+      --saweria-color: #eab308;
+      --bg-gradient: #17212b;
+      --card-bg: #242f3d;
+      --nav-bg: #17212b;
+      --sidebar-bg: #1d2733;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f5f5f5;
+      --text-muted: #7f91a4;
+      --input-bg: #17212b;
+    }
+
+    [data-theme="edge"] {
+      --primary: #0078d4;
+      --primary-hover: #106ebe;
+      --saweria-color: #ffb900;
+      --bg-gradient: #f3f3f3;
+      --card-bg: #ffffff;
+      --nav-bg: #f8f8f8;
+      --sidebar-bg: #f3f3f3;
+      --card-border: #e0e0e0;
+      --text-main: #242424;
+      --text-muted: #616161;
+      --input-bg: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 85px 16px 40px;
+      overflow-x: hidden;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    /* --- INITIAL LOADING SCREEN (10-20 DETIK) --- */
+    #loginSplashScreen {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #090d16;
+      z-index: 99999;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loginSplashScreen.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .splash-logo-box {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .splash-logo-icon {
+      font-size: 60px;
+      color: var(--primary);
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+    .splash-spinner {
+      width: 120px; height: 120px;
+      border: 4px solid rgba(255,255,255,0.05);
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      position: absolute;
+      top: -30px; left: -30px;
+      animation: spin 1.2s linear infinite;
+    }
+    .splash-title {
+      font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .splash-sub {
+      font-size: 13px; color: #94a3b8; margin-bottom: 24px; text-align: center; max-width: 300px;
+    }
+    .splash-progress-bg {
+      width: 260px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; position: relative;
+    }
+    .splash-progress-fill {
+      width: 0%; height: 100%;
+      background: linear-gradient(90deg, #6366f1, #ec4899);
+      transition: width 0.2s ease-out;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.8);
+    }
+    .splash-percent {
+      margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--primary);
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.5)); }
+      50% { transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(236, 72, 153, 0.8)); }
+    }
+
+    .navbar {
+      position: fixed; top: 0; left: 0; width: 100%; height: 65px;
+      background: var(--nav-bg);
+      border-bottom: 1px solid var(--card-border);
+      display: flex; align-items: center; padding: 0 20px; z-index: 900;
+      backdrop-filter: blur(8px);
+      transition: background 0.3s ease;
+    }
+
+    .hamburger-btn {
+      background: transparent; border: none; color: var(--text-main);
+      font-size: 22px; cursor: pointer; transition: color 0.2s, transform 0.2s; margin-right: 16px;
+    }
+    .hamburger-btn:hover { color: var(--primary); transform: scale(1.1); }
+    .nav-brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .nav-brand i { color: var(--primary); animation: pulseGlow 3s infinite ease-in-out; }
+
+    .sidebar {
+      position: fixed; top: 0; left: -300px; width: 280px; height: 100vh;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--card-border); z-index: 1000;
+      transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease; display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar.active { left: 0; }
+
+    .sidebar-header {
+      padding: 20px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .sidebar-header h3 { font-size: 16px; font-weight: 700; }
+    
+    .close-btn {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 20px; cursor: pointer; transition: color 0.2s;
+    }
+    .close-btn:hover { color: #ef4444; }
+
+    .sidebar-menu { list-style: none; padding: 15px 0; }
+    .sidebar-menu li { padding: 0 12px; margin-bottom: 4px; }
+    .sidebar-menu a {
+      display: flex; align-items: center; gap: 12px; text-decoration: none;
+      color: var(--text-muted); font-weight: 500; padding: 10px 14px;
+      border-radius: 8px; transition: all 0.2s ease; cursor: pointer; font-size: 14px;
+    }
+    .sidebar-menu a:hover { background: rgba(99, 102, 241, 0.15); color: var(--primary); transform: translateX(4px); }
+
+    .sidebar-menu a.saweria-link {
+      background: rgba(234, 179, 8, 0.1); color: var(--saweria-color);
+      border: 1px solid rgba(234, 179, 8, 0.2); font-weight: 600;
+    }
+    .sidebar-menu a.saweria-link:hover { background: rgba(234, 179, 8, 0.2); }
+
+    .saweria-badge {
+      margin-left: auto; background: var(--saweria-color); color: #000;
+      font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;
+    }
+
+    .sidebar-section-title {
+      margin: 12px 0 6px 12px; padding: 0 14px; font-size: 11px; font-weight: 700;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+      background: rgba(0, 0, 0, 0.6); z-index: 950;
+      opacity: 0; visibility: hidden; transition: opacity 0.3s;
+    }
+    .overlay.active { opacity: 1; visibility: visible; }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+      background: rgba(0, 0, 0, 0.75); z-index: 1100;
+      display: flex; justify-content: center; align-items: center;
+      opacity: 0; visibility: hidden; transition: opacity 0.3s; padding: 16px;
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+
+    .modal-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; width: 100%; max-width: 500px; padding: 24px;
+      position: relative; backdrop-filter: blur(12px);
+      transition: transform 0.3s ease, background 0.3s ease; max-height: 85vh; overflow-y: auto;
+      transform: scale(0.9);
+    }
+    .modal-overlay.active .modal-card { transform: scale(1); }
+    .modal-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .modal-card p { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+    
+    .modal-close {
+      position: absolute; top: 18px; right: 18px; background: transparent;
+      border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; transition: color 0.2s;
+    }
+    .modal-close:hover { color: #ef4444; }
+
+    .setting-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .setting-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--input-bg);
+      border: 1px solid var(--card-border); border-radius: 8px; cursor: pointer; transition: border-color 0.2s;
+    }
+    .setting-item:hover { border-color: var(--primary); }
+    .setting-item input { accent-color: var(--primary); width: 16px; height: 16px; }
+
+    .history-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+    .history-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px; background: var(--input-bg); border: 1px solid var(--card-border);
+      border-radius: 8px; font-size: 12px;
+    }
+    .btn-clear-history {
+      width: 100%; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; transition: background 0.2s;
+    }
+    .btn-clear-history:hover { background: rgba(239, 68, 68, 0.25); }
+
+    .container {
+      width: 100%; max-width: 620px; background: var(--card-bg);
+      border: 1px solid var(--card-border); border-radius: 16px; padding: 24px;
+      backdrop-filter: blur(12px); transition: background 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .header p { color: var(--text-muted); font-size: 13px; }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.5px; }
+
+    .file-upload-box {
+      border: 2px dashed var(--card-border); border-radius: 12px; padding: 22px 16px;
+      text-align: center; cursor: pointer; background: var(--input-bg); transition: all 0.25s ease;
+    }
+    .file-upload-box:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.05); transform: translateY(-2px); }
+    .file-upload-box i { font-size: 32px; color: var(--primary); margin-bottom: 8px; transition: transform 0.2s; }
+    .file-upload-box:hover i { transform: scale(1.15); }
+    .file-upload-box span { display: block; font-size: 13px; color: var(--text-muted); }
+    input[type="file"] { display: none; }
+
+    input[type="text"] {
+      width: 100%; padding: 12px 14px; background: var(--input-bg);
+      border: 1px solid var(--card-border); border-radius: 8px; color: var(--text-main);
+      font-size: 13px; outline: none; transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: var(--primary); }
+
+    .format-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    }
+    @media (max-width: 480px) { .format-grid { grid-template-columns: 1fr; } }
+    
+    .format-card {
+      position: relative; background: var(--input-bg); border: 1px solid var(--card-border);
+      border-radius: 10px; padding: 12px; cursor: pointer; display: flex; align-items: center;
+      gap: 10px; transition: all 0.25s ease;
+    }
+    .format-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .format-card input[type="radio"] { display: none; }
+    .format-card.active {
+      border-color: var(--primary); background: rgba(99, 102, 241, 0.15);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+    }
+    .format-icon {
+      width: 34px; height: 34px; border-radius: 8px; background: rgba(255, 255, 255, 0.05);
+      display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--primary); flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+    .format-card.active .format-icon { background: var(--primary); color: #fff; }
+    .format-info { display: flex; flex-direction: column; }
+    .format-title { font-size: 13px; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+    .format-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    .progress-wrapper { margin-top: 14px; display: none; flex-direction: column; gap: 6px; }
+    .progress-wrapper.active { display: flex; }
+    .progress-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
+    .progress-bar-bg { width: 100%; height: 8px; background: var(--input-bg); border-radius: 4px; overflow: hidden; position: relative; }
+    .progress-bar-fill {
+      width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), #ec4899);
+      transition: width 0.2s ease;
+    }
+
+    .btn-submit {
+      width: 100%; background: #6366f1; color: white; border: none; padding: 14px;
+      border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+      display: flex; justify-content: center; align-items: center; gap: 8px;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35); transition: all 0.25s ease;
+    }
+    .btn-submit:hover { background: #4f46e5; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .preview-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 24px; margin-bottom: 14px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;
+    }
+    .preview-title { font-size: 16px; font-weight: 700; }
+
+    #preview { display: flex; flex-direction: column; gap: 16px; }
+
+    .output-card {
+      background: var(--input-bg); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .img-wrapper {
+      width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center;
+      background: #ffffff; border-radius: 8px; padding: 10px; min-height: 180px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+    }
+    .output-card img {
+      width: 100%; border-radius: 6px; object-fit: contain; max-height: 420px;
+      transition: transform 0.3s ease;
+    }
+
+    .card-actions { display: flex; gap: 10px; width: 100%; }
+
+    .btn-rotate {
+      background: var(--card-bg); color: var(--text-main); border: 1px solid var(--card-border);
+      padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .btn-rotate:hover { background: rgba(255, 255, 255, 0.15); transform: rotate(90deg); }
+
+    .btn-download {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      background: #10b981; color: white; text-decoration: none; font-weight: 700; font-size: 13px;
+      padding: 11px 16px; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s ease;
+    }
+    .btn-download:hover { background: #059669; transform: translateY(-1px); }
+
+    .btn-zip {
+      background: #8b5cf6; color: white; border: none; padding: 8px 14px;
+      border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;
+    }
+    .btn-zip:hover { background: #7c3aed; transform: translateY(-1px); }
+
+    /* Render Offscreen Container */
+    #renderContainer {
+      position: absolute; left: -9999px; top: -9999px;
+      width: 800px; background: #ffffff; color: #000000;
+      padding: 0; border-radius: 0;
+    }
+
+    /* Style Khusus Tabel Excel saat di-render */
+    .excel-table-container {
+      width: 794px;
+      min-height: 1123px;
+      padding: 40px;
+      background: #ffffff;
+      color: #000000;
+      box-sizing: border-box;
+    }
+    .excel-table-container table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .excel-table-container th, .excel-table-container td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .excel-table-container th {
+      background-color: #f1f5f9;
+      font-weight: bold;
+    }
+
+    .hidden { display: none !important; }
+
+    html.no-effects *, html.no-effects *::before, html.no-effects *::after {
+      transition: none !important; animation: none !important; box-shadow: none !important;
+      filter: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    }
+    html.no-effects .output-card img, html.no-effects .btn-rotate { transform: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- LOADING SCREEN MASUK / LOGIN (10 - 20 DETIK) -->
+<div id="loginSplashScreen">
+  <div class="splash-logo-box">
+    <div class="splash-spinner"></div>
+    <i class="fa-solid fa-file-image splash-logo-icon"></i>
+  </div>
+  <div class="splash-title">Doc2Img Studio</div>
+  <div class="splash-sub" id="splashStatusText">Memulai Engine Client-Side...</div>
+  <div class="splash-progress-bg">
+    <div class="splash-progress-fill" id="splashProgressFill"></div>
+  </div>
+  <div class="splash-percent" id="splashPercentText">0%</div>
+</div>
+
+<nav class="navbar">
+  <button class="hamburger-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+  <div class="nav-brand"><i class="fa-solid fa-file-image"></i> Doc2Img Studio</div>
+</nav>
+
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h3>Menu Navigasi</h3>
+    <button class="close-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <ul class="sidebar-menu">
+    <li><a onclick="closeSidebarNav(); window.scrollTo({top:0, behavior: document.documentElement.classList.contains('no-effects') ? 'auto' : 'smooth'})"><i class="fa-solid fa-house"></i> Beranda Konverter</a></li>
+    <li><a onclick="openModal('modalHistory')"><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Konversi</a></li>
+    <li><a onclick="openModal('modalSettings')"><i class="fa-solid fa-gear"></i> Pengaturan Kualitas & FPS</a></li>
+    <li>
+      <label class="setting-item" style="margin:4px 0; color:var(--text-muted); cursor:pointer;">
+        <span style="display:flex;align-items:center;gap:10px;">
+          <i class="fa-solid fa-gauge-high"></i>
+          <span><strong style="color:var(--text-main);">Visual Efek</strong>
+          <small id="effectsStatus" style="display:block;font-size:10px;">Aktif</small></span>
+        </span>
+        <input type="checkbox" id="visualEffectsToggle" checked onchange="toggleVisualEffects(this.checked)">
+      </label>
+    </li>
+    <li>
+      <a href="https://saweria.co/buyaplikasibuatanku" target="_blank" rel="noopener noreferrer" class="saweria-link">
+        <i class="fa-solid fa-hand-holding-dollar"></i> Dukung via Saweria
+        <span class="saweria-badge">Dukung</span>
+      </a>
+    </li>
+    <li><a onclick="openModal('modalAbout')"><i class="fa-solid fa-circle-info"></i> Tentang Aplikasi</a></li>
+    <li class="sidebar-section-title">Tema UI</li>
+    <li><a onclick="openModal('modalTheme')"><i class="fa-solid fa-palette"></i> Pilih Tema Tampilan</a></li>
+  </ul>
+</div>
+
+<!-- MODAL POPUP: RIWAYAT -->
+<div class="modal-overlay" id="modalHistory">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeModal('modalHistory')"><i class="fa-solid fa-xmark"></i></button>
+    <h3><i class="fa-solid fa-clock-rotate-left" style="color: var(--primary);"></i> Riwayat Konversi</h3>
+    <p>Daftar konversi gambar yang tersimpan secara lokal:</p>
+    <div class="history-list" id="historyListContainer"></div>
+    <button class="btn-clear-history" onclick="clearHistory()"><i class="fa-solid fa-trash-can"></i> Hapus Riwayat</button>
+  </div>
+</div>
+
+<!-- MODAL POPUP: PENGATURAN -->
+<div class="modal-overlay" id="modalSettings">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeModal('modalSettings')"><i class="fa-solid fa-xmark"></i></button>
+    <h3><i class="fa-solid fa-gear" style="color: var(--primary);"></i> Pengaturan Kualitas</h3>
+    <p>Pilih skala rendering resolusi gambar (Disarankan 1.0x untuk perangkat entry-level):</p>
+    <div class="setting-options">
+      <label class="setting-item">
+        <div><strong>Ringan (1.0x)</strong> - Cepat & Stabil</div>
+        <input type="radio" name="renderQuality" value="1.0" checked onchange="changeQuality(1.0)">
+      </label>
+      <label class="setting-item">
+        <div><strong>Seimbang (1.25x)</strong></div>
+        <input type="radio" name="renderQuality" value="1.25" onchange="changeQuality(1.25)">
+      </label>
+      <label class="setting-item">
+        <div><strong>Tinggi (1.5x)</strong> - HD / Tajam</div>
+        <input type="radio" name="renderQuality" value="1.5" onchange="changeQuality(1.5)">
+      </label>
+    </div>
+
+    <h3 style="margin-top: 16px;"><i class="fa-solid fa-gauge-high" style="color: var(--primary);"></i> Batas FPS (Frame Limit)</h3>
+    <p>Batas refresh rate layar untuk menghemat penggunaan baterai dan daya CPU:</p>
+    <div class="setting-options">
+      <label class="setting-item">
+        <div><strong>30 FPS</strong> - Hemat Baterai / CPU Ringan</div>
+        <input type="radio" name="fpsLimit" value="30" checked onchange="changeFPS(30)">
+      </label>
+      <label class="setting-item">
+        <div><strong>60 FPS</strong> - Tampilan Halus</div>
+        <input type="radio" name="fpsLimit" value="60" onchange="changeFPS(60)">
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL POPUP: TEMA -->
+<div class="modal-overlay" id="modalTheme">
+  <div class="modal-card">
+    <button class="modal-close" onclick="closeModal('modalTheme')"><i class="fa-solid fa-xmark"></i></button>
+    <h3><i class="fa-solid fa-palette" style="color: var(--primary);"></i> Tema Tampilan UI</h3>
+    <p>Pilih nuansa warna antarmuka favorit Anda:</p>
+    <div class="setting-options">
+      <label class="setting-item"><div><strong>Dark Modern (Bawaan)</strong></div><input type="radio" name="themeOption" value="dark" checked onchange="changeTheme('dark')"></label>
+      <label class="setting-item"><div><strong>Light Mode</strong></div><input type="radio" name="themeOption" value="light" onchange="changeTheme('light')"></label>
+      <label class="setting-item"><div><strong>Glassmorphism</strong></div><input type="radio" name="themeOption" value="glass" onchange="changeTheme('glass')"></label>
+      <label class="setting-item"><div><strong>Facebook</strong></div><input type="radio" name="themeOption" value="facebook" onchange="changeTheme('facebook')"></label>
+      <label class="setting-item"><div><strong>Twitter</strong></div><input type="radio" name="themeOption" value="twitter" onchange="changeTheme('twitter')"></label>
+      <label class="setting-item"><div><strong>Instagram</strong></div><input type="radio" name="themeOption" value="instagram" onchange="changeTheme('instagram')"></label>
+      <label class="setting-item"><div><strong>WhatsApp</strong></div><input type="radio" name="themeOption" value="whatsapp" onchange="changeTheme('whatsapp')"></label>
+      <label class="setting-item"><div><strong>Telegram</strong></div><input type="radio" name="themeOption" value="telegram" onchange="changeTheme('telegram')"></label>
+      <label class="setting-item"><div><strong>Edge Microsoft</strong></div><input type="radio" name="themeOption" value="edge" onchange="changeTheme('edge')"></label>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL POPUP: TENTANG APLIKASI -->
+<div class="modal-overlay" id="modalAbout">
+  <div class="modal-card" style="max-width: 540px;">
+    <button class="modal-close" onclick="closeModal('modalAbout')"><i class="fa-solid fa-xmark"></i></button>
+    <h3><i class="fa-solid fa-circle-info" style="color: var(--primary);"></i> Tentang Doc2Img Studio</h3>
+    <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px;">
+      <div>
+        <h4 style="font-size: 14px; color: var(--primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cube"></i> Apa Itu Doc2Img Studio?
+        </h4>
+        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+          <strong>Doc2Img Studio</strong> adalah platform konverter dokumen ke gambar serbaguna berbasis <em>Full Client-Side Engine</em>. Seluruh proses konversi berjalan 100% langsung di dalam peramban (browser) perangkat Anda tanpa mengunggah berkas ke server mana pun.
+        </p>
+      </div>
+
+      <div style="background: var(--input-bg); border: 1px solid var(--card-border); padding: 12px; border-radius: 10px;">
+        <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text-main);">
+          <i class="fa-solid fa-bolt" style="color: #eab308;"></i> Fitur Unggulan Per Halaman:
+        </h4>
+        <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; line-height: 1.6;">
+          <li><strong>DOCX Page Splitter:</strong> Memecah dokumen Word menjadi halaman-halaman terpisah secara otomatis.</li>
+          <li><strong>XLSX Page Splitter:</strong> Ekstraksi presisi tiap sheet & pembagian baris data per halaman A4.</li>
+          <li><strong>PPTX Slide Renderer:</strong> Mengunduh tiap slide PowerPoint secara individual dalam rasio 16:9.</li>
+          <li><strong>PDF Per Halaman:</strong> Ekstraksi presisi per halaman PDF ke berbagai format gambar.</li>
+        </ul>
+      </div>
+
+      <div style="padding-top: 10px; border-top: 1px solid var(--card-border); font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+        <span>Versi: <strong>3.5.0 (Enhanced XLSX Pagination)</strong></span>
+        <span>Lisensi: <strong>Bebas & Gratis</strong></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="header">
+    <h2>Document & Image Converter</h2>
+    <p>Konversi PDF, Word, Excel, PowerPoint, HTML, TXT, & Gambar secara praktis</p>
+  </div>
+  
+  <div class="form-group">
+    <label>Unggah Berkas</label>
+    <div class="file-upload-box" onclick="document.getElementById('fileInput').click()">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <span id="uploadLabel"><strong>Klik untuk memilih berkas</strong><br>(PDF, DOCX, XLSX, PPTX, HTML, TXT, SVG, PNG, JPG, WEBP)</span>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.pptx,.html,.txt,.svg,.png,.jpg,.jpeg,.webp" onchange="handleFileUpload()">
+  </div>
+
+  <div class="form-group">
+    <label>Format Output Gambar Target</label>
+    <div class="format-grid">
+      <label class="format-card active" onclick="selectFormatCard(this)">
+        <input type="radio" name="outputFormatOption" value="png" checked>
+        <div class="format-icon"><i class="fa-solid fa-file-image"></i></div>
+        <div class="format-info">
+          <span class="format-title">PNG</span>
+          <span class="format-desc">Kualitas Tinggi & Jernih</span>
+        </div>
+      </label>
+
+      <label class="format-card" onclick="selectFormatCard(this)">
+        <input type="radio" name="outputFormatOption" value="jpeg">
+        <div class="format-icon"><i class="fa-solid fa-image"></i></div>
+        <div class="format-info">
+          <span class="format-title">JPEG</span>
+          <span class="format-desc">Ukuran Standar</span>
+        </div>
+      </label>
+
+      <label class="format-card" onclick="selectFormatCard(this)">
+        <input type="radio" name="outputFormatOption" value="webp">
+        <div class="format-icon"><i class="fa-solid fa-bolt"></i></div>
+        <div class="format-info">
+          <span class="format-title">WEBP</span>
+          <span class="format-desc">Paling Ringkas</span>
+        </div>
+      </label>
+
+      <label class="format-card" onclick="selectFormatCard(this)">
+        <input type="radio" name="outputFormatOption" value="svg">
+        <div class="format-icon"><i class="fa-solid fa-vector-square"></i></div>
+        <div class="format-info">
+          <span class="format-title">SVG</span>
+          <span class="format-desc">Format Vektor</span>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <div class="form-group hidden" id="pageRangeGroup">
+    <label for="pageRange">Halaman PDF (Opsional)</label>
+    <input type="text" id="pageRange" placeholder="Contoh: 1, 3-5 (Kosongkan untuk seluruh halaman)">
+  </div>
+
+  <div class="progress-wrapper" id="progressWrapper">
+    <div class="progress-info">
+      <span id="progressStatus">Memproses...</span>
+      <span id="progressPercent">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressBarFill"></div>
+    </div>
+  </div>
+
+  <button class="btn-submit" id="btnProcess" onclick="prosesFile()" style="margin-top: 14px;">
+    <i class="fa-solid fa-wand-magic-sparkles"></i> Konversi Sekarang
+  </button>
+
+  <div class="preview-header">
+    <span class="preview-title">Hasil Konversi</span>
+    <button id="btnDownloadAllZip" class="btn-zip hidden" onclick="downloadAllAsZip()">
+      <i class="fa-solid fa-file-zipper"></i> Unduh Semua (.ZIP)
+    </button>
+  </div>
+
+  <div id="renderContainer"></div>
+  <div id="preview">
+    <span style="color: var(--text-muted); font-size: 13px;">Belum ada berkas yang dikonversi.</span>
+  </div>
+</div>
+
+<script>
+  let currentScale = 1.0; 
+  let targetFPS = 30;     
+  let generatedImages = []; 
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  /* --- LOGIKA LOADING / SPLASH SCREEN (10 - 20 DETIK) --- */
+  function startSplashScreen() {
+    const splash = document.getElementById('loginSplashScreen');
+    const fill = document.getElementById('splashProgressFill');
+    const percentText = document.getElementById('splashPercentText');
+    const statusText = document.getElementById('splashStatusText');
+
+    const totalDuration = Math.floor(Math.random() * 10000) + 10000;
+    const updateInterval = 100;
+    let elapsedTime = 0;
+
+    const messages = [
+      "Memuat pustaka PDF.js...",
+      "Inisialisasi Mammoth DOCX Engine...",
+      "Menyiapkan XLSX Sheet Engine...",
+      "Menyinkronkan skema warna UI...",
+      "Menyiapkan modul Client-Side...",
+      "Hampir selesai, memuat antarmuka..."
+    ];
+
+    const timer = setInterval(() => {
+      elapsedTime += updateInterval;
+      const progress = Math.min(100, Math.floor((elapsedTime / totalDuration) * 100));
+      
+      fill.style.width = progress + '%';
+      percentText.innerText = progress + '%';
+
+      const msgIndex = Math.floor((progress / 100) * messages.length);
+      if (messages[msgIndex]) statusText.innerText = messages[msgIndex];
+
+      if (elapsedTime >= totalDuration) {
+        clearInterval(timer);
+        splash.classList.add('fade-out');
+      }
+    }, updateInterval);
+  }
+
+  function changeTheme(themeName) {
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem('doc2img_theme', themeName);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    startSplashScreen();
+
+    const savedTheme = localStorage.getItem('doc2img_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const themeRadio = document.querySelector(`input[name="themeOption"][value="${savedTheme}"]`);
+    if (themeRadio) themeRadio.checked = true;
+
+    const effectsEnabled = localStorage.getItem('doc2img_visual_effects') !== 'off';
+    const toggle = document.getElementById('visualEffectsToggle');
+    if (toggle) toggle.checked = effectsEnabled;
+    applyVisualEffects(effectsEnabled);
+  });
+
+  function applyVisualEffects(enabled) {
+    document.documentElement.classList.toggle('no-effects', !enabled);
+    const status = document.getElementById('effectsStatus');
+    if (status) status.textContent = enabled ? 'Aktif' : 'Dimatikan • Performa';
+  }
+
+  function toggleVisualEffects(enabled) {
+    localStorage.setItem('doc2img_visual_effects', enabled ? 'on' : 'off');
+    applyVisualEffects(enabled);
+  }
+
+  function changeQuality(val) { currentScale = parseFloat(val); }
+  function changeFPS(val) { targetFPS = parseInt(val); }
+
+  function selectFormatCard(element) {
+    document.querySelectorAll('.format-card').forEach(card => card.classList.remove('active'));
+    element.classList.add('active');
+    const radio = element.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('overlay').classList.toggle('active');
+  }
+
+  function closeSidebarNav() {
+    document.getElementById('sidebar').classList.remove('active');
+    document.getElementById('overlay').classList.remove('active');
+  }
+
+  function openModal(id) {
+    closeSidebarNav();
+    if(id === 'modalHistory') loadHistoryUI();
+    document.getElementById(id).classList.add('active');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+  }
+
+  function updateProgress(percent, statusText) {
+    const wrapper = document.getElementById('progressWrapper');
+    const fill = document.getElementById('progressBarFill');
+    const percentTxt = document.getElementById('progressPercent');
+    const statusTxt = document.getElementById('progressStatus');
+
+    wrapper.classList.add('active');
+    fill.style.width = percent + '%';
+    percentTxt.innerText = Math.round(percent) + '%';
+    if(statusText) statusTxt.innerText = statusText;
+  }
+
+  function hideProgress() {
+    setTimeout(() => {
+      document.getElementById('progressWrapper').classList.remove('active');
+      document.getElementById('progressBarFill').style.width = '0%';
+    }, 500);
+  }
+
+  function handleFileUpload() {
+    const fileInput = document.getElementById('fileInput');
+    const pageRangeGroup = document.getElementById('pageRangeGroup');
+    const uploadLabel = document.getElementById('uploadLabel');
+
+    if (!fileInput.files.length) return;
+    const file = fileInput.files[0];
+    uploadLabel.innerHTML = `Terpilih: <strong>${file.name}</strong>`;
+    
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      pageRangeGroup.classList.remove('hidden');
+    } else {
+      pageRangeGroup.classList.add('hidden');
+    }
+  }
+
+  function saveToHistory(fileName, imgData) {
+    let history = JSON.parse(localStorage.getItem('doc2img_history') || '[]');
+    const now = new Date();
+    const timeStr = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+    
+    history.unshift({ name: fileName, data: imgData, time: timeStr });
+    if(history.length > 5) history.pop();
+    try { localStorage.setItem('doc2img_history', JSON.stringify(history)); } catch(e) {}
+  }
+
+  function loadHistoryUI() {
+    const container = document.getElementById('historyListContainer');
+    let history = JSON.parse(localStorage.getItem('doc2img_history') || '[]');
+    if(history.length === 0) {
+      container.innerHTML = '<span style="color: var(--text-muted); font-size: 12px;">Belum ada riwayat konversi.</span>';
+      return;
+    }
+    container.innerHTML = history.map((item) => `
+      <div class="history-item">
+        <div>
+          <strong>${item.name}</strong>
+          <span style="display:block; color:var(--text-muted); font-size:10px;">${item.time}</span>
+        </div>
+        <button onclick="downloadFromData('${item.data}', '${item.name}')" class="btn-download" style="padding: 6px 10px; font-size: 11px;">
+          <i class="fa-solid fa-download"></i>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function clearHistory() {
+    localStorage.removeItem('doc2img_history');
+    loadHistoryUI();
+  }
+
+  function parsePageRange(rangeStr, totalPages) {
+    if (!rangeStr.trim()) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages = new Set();
+    const parts = rangeStr.split(',');
+    parts.forEach(part => {
+      if (part.includes('-')) {
+        const [start, end] = part.split('-').map(Number);
+        if (start && end) {
+          for (let i = Math.max(1, start); i <= Math.min(totalPages, end); i++) pages.add(i);
+        }
+      } else {
+        const pageNum = Number(part.trim());
+        if (pageNum >= 1 && pageNum <= totalPages) pages.add(pageNum);
+      }
+    });
+    return Array.from(pages).sort((a, b) => a - b);
+  }
+
+  function canvasToSVG(canvas) {
+    const imgData = canvas.toDataURL('image/png');
+    const width = canvas.width;
+    const height = canvas.height;
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <image href="${imgData}" x="0" y="0" width="${width}" height="${height}" />
+    </svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+  }
+
+  async function renderHtmlNodeToCanvas(element) {
+    return await html2canvas(element, {
+      logging: false,
+      useCORS: true,
+      scale: currentScale,
+      backgroundColor: '#ffffff'
+    });
+  }
+
+  async function waitForImages(root) {
+    const images = Array.from(root.querySelectorAll('img'));
+    await Promise.all(images.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    }));
+  }
+
+  /* LOGIKA PEMISAH HALAMAN DOCX (A4 HEIGHT SPLITTER) */
+  async function splitDocxIntoPages(rawHtml) {
+    const hiddenContainer = document.createElement('div');
+    hiddenContainer.style.cssText = 'position:absolute; left:-9999px; top:-9999px; width:794px; background:#fff; color:#000; padding:54px 60px; box-sizing:border-box; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6;';
+    hiddenContainer.innerHTML = rawHtml;
+    document.body.appendChild(hiddenContainer);
+
+    await waitForImages(hiddenContainer);
+
+    const pages = [];
+    let currentPage = document.createElement('div');
+    currentPage.style.cssText = 'width:794px; min-height:1123px; padding:54px 60px; box-sizing:border-box; background:#fff; color:#000; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6; word-wrap:break-word;';
+
+    const nodes = Array.from(hiddenContainer.childNodes);
+
+    for (let node of nodes) {
+      const clone = node.cloneNode(true);
+      currentPage.appendChild(clone);
+
+      const tempRender = document.createElement('div');
+      tempRender.style.cssText = 'position:absolute; left:-9999px; top:-9999px;';
+      tempRender.appendChild(currentPage.cloneNode(true));
+      document.body.appendChild(tempRender);
+
+      if (tempRender.firstChild.clientHeight > 1123 && currentPage.childNodes.length > 1) {
+        currentPage.removeChild(currentPage.lastChild);
+        pages.push(currentPage.outerHTML);
+
+        currentPage = document.createElement('div');
+        currentPage.style.cssText = 'width:794px; min-height:1123px; padding:54px 60px; box-sizing:border-box; background:#fff; color:#000; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6; word-wrap:break-word;';
+        currentPage.appendChild(clone);
+      }
+      tempRender.remove();
+    }
+
+    if (currentPage.childNodes.length > 0) {
+      pages.push(currentPage.outerHTML);
+    }
+
+    hiddenContainer.remove();
+    return pages;
+  }
+
+  /* LOGIKA PERBAIKAN PEMISAHAN HALAMAN UTK XLSX TABLE */
+  async function splitXlsxSheetIntoPages(tableHtml, sheetName) {
+    const tempHolder = document.createElement('div');
+    tempHolder.innerHTML = tableHtml;
+    const table = tempHolder.querySelector('table');
+    if(!table) return [];
+
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if(rows.length === 0) return [];
+
+    let headerRowHtml = '';
+    let bodyRows = [];
+
+    if (table.querySelector('thead tr')) {
+      headerRowHtml = table.querySelector('thead tr').outerHTML;
+      bodyRows = Array.from(table.querySelectorAll('tbody tr'));
+    } else {
+      headerRowHtml = rows[0].outerHTML;
+      bodyRows = rows.slice(1);
+    }
+
+    const pages = [];
+    let currentContainer = document.createElement('div');
+    currentContainer.className = 'excel-table-container';
+    
+    let titleHtml = `<h3 style="margin-bottom:12px; font-weight:700; color:#0f172a;">Sheet: ${sheetName}</h3>`;
+    let currentTable = document.createElement('table');
+    currentTable.innerHTML = `<thead>${headerRowHtml}</thead><tbody></tbody>`;
+
+    currentContainer.innerHTML = titleHtml;
+    currentContainer.appendChild(currentTable);
+
+    const tbody = currentTable.querySelector('tbody');
+
+    for (let row of bodyRows) {
+      const rowClone = row.cloneNode(true);
+      tbody.appendChild(rowClone);
+
+      const tempRender = document.createElement('div');
+      tempRender.style.cssText = 'position:absolute; left:-9999px; top:-9999px;';
+      tempRender.appendChild(currentContainer.cloneNode(true));
+      document.body.appendChild(tempRender);
+
+      if (tempRender.firstChild.clientHeight > 1123 && tbody.childNodes.length > 1) {
+        tbody.removeChild(tbody.lastChild);
+        pages.push(currentContainer.outerHTML);
+
+        currentContainer = document.createElement('div');
+        currentContainer.className = 'excel-table-container';
+        currentTable = document.createElement('table');
+        currentTable.innerHTML = `<thead>${headerRowHtml}</thead><tbody></tbody>`;
+        currentContainer.innerHTML = titleHtml;
+        currentContainer.appendChild(currentTable);
+        
+        const newTbody = currentTable.querySelector('tbody');
+        newTbody.appendChild(rowClone);
+      }
+      tempRender.remove();
+    }
+
+    if (tbody.childNodes.length > 0 || pages.length === 0) {
+      pages.push(currentContainer.outerHTML);
+    }
+
+    return pages;
+  }
+
+  /* UTAMA: PROSES KONVERSI FILE */
+  async function prosesFile() {
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const renderContainer = document.getElementById('renderContainer');
+    const btnProcess = document.getElementById('btnProcess');
+    
+    const selectedFormatInput = document.querySelector('input[name="outputFormatOption"]:checked');
+    const formatSelect = selectedFormatInput ? selectedFormatInput.value : 'png';
+
+    if (!fileInput.files.length) { alert("Pilih berkas terlebih dahulu!"); return; }
+
+    const file = fileInput.files[0];
+    const fileNameLower = file.name.toLowerCase();
+    btnProcess.disabled = true;
+    preview.innerHTML = "";
+    generatedImages = [];
+    document.getElementById('btnDownloadAllZip').classList.add('hidden');
+
+    let mimeType = 'image/png';
+    if (formatSelect === 'jpeg') mimeType = 'image/jpeg';
+    else if (formatSelect === 'webp') mimeType = 'image/webp';
+    else if (formatSelect === 'svg') mimeType = 'image/svg+xml';
+    const ext = formatSelect;
+
+    try {
+      // 1. DOKUMEN WORD (.DOCX)
+      if (fileNameLower.endsWith('.docx')) {
+        updateProgress(15, 'Membaca berkas Word...');
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+
+        updateProgress(40, 'Memisah halaman Word...');
+        const pageHtmls = await splitDocxIntoPages(result.value);
+
+        for (let i = 0; i < pageHtmls.length; i++) {
+          updateProgress(40 + ((i / pageHtmls.length) * 55), `Merender Halaman ${i + 1} dari ${pageHtmls.length}...`);
+          renderContainer.innerHTML = pageHtmls[i];
+          await waitForImages(renderContainer);
+
+          const canvas = await renderHtmlNodeToCanvas(renderContainer.firstChild);
+          tampilkanDownload(canvas, `Halaman_${i + 1}.${ext}`, mimeType, formatSelect);
+        }
+        renderContainer.innerHTML = "";
+      }
+
+      // 2. POWERPOINT PRESENTATION (.PPTX)
+      else if (fileNameLower.endsWith('.pptx')) {
+        updateProgress(15, 'Membaca presentasi PPTX...');
+        renderContainer.style.width = '960px';
+        renderContainer.innerHTML = `<div id="pptx-target" style="width:960px;"></div>`;
+
+        if (typeof $ === 'undefined' || !$.fn.pptx2html) {
+          throw new Error('Modul PPTX belum siap. Silakan refresh halaman.');
+        }
+
+        await new Promise((resolve, reject) => {
+          $("#pptx-target").pptx2html({
+            file: file,
+            slideMode: false,
+            keyProcess: false,
+            slideType: "16:9",
+            mediaProcess: true,
+            success: function() { resolve(); },
+            error: function(err) { reject(err || new Error("Gagal membaca berkas PPTX.")); }
+          });
+        });
+
+        updateProgress(45, 'Mengekstrak slide presentasi...');
+        await waitForImages(document.getElementById('pptx-target'));
+
+        let slides = document.querySelectorAll('#pptx-target .slide, #pptx-target > div[id^="slide"]');
+        if (!slides.length) slides = document.querySelectorAll('#pptx-target > div');
+
+        if (!slides.length) throw new Error('Tidak ada slide yang terdeteksi.');
+
+        for (let i = 0; i < slides.length; i++) {
+          updateProgress(45 + ((i / slides.length) * 50), `Merender Slide ${i + 1} dari ${slides.length}...`);
+          
+          const slideBox = document.createElement('div');
+          slideBox.style.cssText = 'width:960px; height:540px; position:relative; overflow:hidden; background:#ffffff; margin:0 auto;';
+          slideBox.appendChild(slides[i].cloneNode(true));
+
+          renderContainer.innerHTML = "";
+          renderContainer.appendChild(slideBox);
+          await waitForImages(slideBox);
+
+          const canvas = await renderHtmlNodeToCanvas(slideBox);
+          tampilkanDownload(canvas, `Slide_${i + 1}.${ext}`, mimeType, formatSelect);
+        }
+        renderContainer.innerHTML = "";
+        renderContainer.style.width = '800px';
+      }
+
+      // 3. EXCEL SPREADSHEET (.XLSX) - DIPERBAIKI PRESISI PER HALAMAN
+      else if (fileNameLower.endsWith('.xlsx')) {
+        updateProgress(15, 'Membaca lembar kerja Excel...');
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+        let totalSheets = workbook.SheetNames.length;
+        let sheetCount = 0;
+
+        for (const sheetName of workbook.SheetNames) {
+          sheetCount++;
+          updateProgress(20 + ((sheetCount / totalSheets) * 30), `Mengekstrak Sheet ${sheetName}...`);
+
+          const rawTableHtml = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
+          const pages = await splitXlsxSheetIntoPages(rawTableHtml, sheetName);
+
+          for (let p = 0; p < pages.length; p++) {
+            updateProgress(50 + ((p + 1) / pages.length) * 45, `Merender Sheet ${sheetName} - Halaman ${p + 1}...`);
+            renderContainer.innerHTML = pages[p];
+            await waitForImages(renderContainer);
+
+            const canvas = await renderHtmlNodeToCanvas(renderContainer.firstChild);
+            tampilkanDownload(canvas, `Sheet_${sheetName}_Hal_${p + 1}.${ext}`, mimeType, formatSelect);
+          }
+        }
+        renderContainer.innerHTML = "";
+      }
+
+      // 4. PDF DOCUMENT
+      else if (fileNameLower.endsWith('.pdf')) {
+        updateProgress(10, 'Membaca dokumen PDF...');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+        const targetPages = parsePageRange(document.getElementById('pageRange').value, pdf.numPages);
+
+        let completed = 0;
+        for (let pageNum of targetPages) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: currentScale });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d', { alpha: false });
+          canvas.height = viewport.height; canvas.width = viewport.width;
+
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
+          tampilkanDownload(canvas, `Halaman_${pageNum}.${ext}`, mimeType, formatSelect);
+          page.cleanup();
+
+          completed++;
+          updateProgress((completed / targetPages.length) * 100, `Merender Halaman ${completed} dari ${targetPages.length}...`);
+        }
+      }
+
+      // 5. TXT / HTML
+      else if (fileNameLower.endsWith('.html') || fileNameLower.endsWith('.txt')) {
+        updateProgress(20, 'Membaca berkas teks...');
+        const text = await file.text();
+        updateProgress(50, 'Merender Teks/HTML...');
+        
+        if (fileNameLower.endsWith('.txt')) {
+          renderContainer.innerHTML = `<pre style="padding:24px; background:#1e293b; color:#f8fafc; font-family:monospace; white-space:pre-wrap; font-size:14px; width:750px; border-radius:12px;">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
+        } else {
+          renderContainer.innerHTML = text;
+        }
+
+        const canvas = await renderHtmlNodeToCanvas(renderContainer);
+        tampilkanDownload(canvas, `Halaman_1.${ext}`, mimeType, formatSelect);
+        renderContainer.innerHTML = "";
+      }
+
+      // 6. GAMBAR (PNG, JPG, WEBP, SVG)
+      else if (/\.(png|jpg|jpeg|webp|svg)$/i.test(fileNameLower)) {
+        updateProgress(20, 'Membaca berkas gambar...');
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * currentScale;
+            canvas.height = img.height * currentScale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+            tampilkanDownload(canvas, `${baseName}_dikonversi.${ext}`, mimeType, formatSelect);
+            updateProgress(100, 'Selesai!');
+            hideProgress();
+            btnProcess.disabled = false;
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        return;
+      } else {
+        alert("Format berkas tidak didukung!");
+      }
+
+      if (generatedImages.length > 1) {
+        document.getElementById('btnDownloadAllZip').classList.remove('hidden');
+      }
+
+      updateProgress(100, 'Selesai!');
+      hideProgress();
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengonversi berkas: " + err.message);
+      hideProgress();
+    } finally {
+      btnProcess.disabled = false;
+    }
+  }
+
+  /* MENAMPILKAN HASIL KONVERSI DALAM CARD TERPISAH PER HALAMAN */
+  function tampilkanDownload(canvas, fileName, mimeType = 'image/png', format = 'png') {
+    const preview = document.getElementById('preview');
+    let imgData = (format === 'svg') ? canvasToSVG(canvas) : canvas.toDataURL(mimeType, 0.85);
+    
+    saveToHistory(fileName, imgData);
+    generatedImages.push({ name: fileName, data: imgData });
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'output-card';
+
+    const imgWrapper = document.createElement('div');
+    imgWrapper.className = 'img-wrapper';
+
+    const img = document.createElement('img'); 
+    img.src = imgData;
+    img.dataset.rotation = "0";
+    imgWrapper.appendChild(img);
+
+    const cardActions = document.createElement('div');
+    cardActions.className = 'card-actions';
+
+    const btnRotate = document.createElement('button');
+    btnRotate.className = 'btn-rotate';
+    btnRotate.innerHTML = `<i class="fa-solid fa-rotate-right"></i>`;
+    btnRotate.title = "Putar Gambar";
+    btnRotate.onclick = () => {
+      let currentRotation = (parseInt(img.dataset.rotation) + 90) % 360;
+      img.dataset.rotation = currentRotation;
+      img.style.transform = `rotate(${currentRotation}deg)`;
+    };
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-download';
+    btn.innerHTML = `<i class="fa-solid fa-download"></i> Unduh ${fileName}`;
+    btn.onclick = () => downloadFromData(imgData, fileName);
+
+    cardActions.appendChild(btnRotate);
+    cardActions.appendChild(btn);
+    wrapper.appendChild(imgWrapper); 
+    wrapper.appendChild(cardActions);
+    preview.appendChild(wrapper);
+  }
+
+  async function downloadAllAsZip() {
+    if (generatedImages.length === 0) return;
+    updateProgress(10, 'Membuat berkas ZIP...');
+    
+    const zip = new JSZip();
+    generatedImages.forEach((imgObj) => {
+      if (imgObj.name.endsWith('.svg')) {
+        const svgContent = decodeURIComponent(imgObj.data.replace('data:image/svg+xml;charset=utf-8,', ''));
+        zip.file(imgObj.name, svgContent);
+      } else {
+        zip.file(imgObj.name, imgObj.data.split(',')[1], { base64: true });
+      }
+    });
+
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(content);
+    a.download = 'Doc2Img_Hasil_Konversi.zip';
+    a.click();
+    hideProgress();
+  }
+
+  function downloadFromData(imgData, fileName) {
+    const a = document.createElement('a');
+    a.href = imgData;
+    a.download = fileName;
+    a.click();
+  }
+</script>
+</body>
+</html>
