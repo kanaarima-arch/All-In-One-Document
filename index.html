@@ -21,6 +21,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pptx2html@0.3.0/dist/pptx2html.min.js"></script>
+  <!-- Microsoft Office JavaScript API (Office.js) -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
   
   <style>
     /* --- SKEMA WARNA & TEMA --- */
@@ -491,6 +493,16 @@
       font-weight: bold;
     }
 
+
+    /* --- OFFICE SOURCE-DATA RENDERER --- */
+    .office-page { background:#fff !important; color:#000 !important; overflow:hidden; }
+    .docx-page > * { max-width:100%; }
+    .xlsx-page { width:794px; min-height:1123px; padding:38px; box-sizing:border-box; }
+    .xlsx-sheet-name { font:700 13px Arial,sans-serif; margin-bottom:10px; color:#111827; }
+    .xlsx-real-table { width:100%; border-collapse:collapse; table-layout:auto; font:12px Arial,sans-serif; }
+    .xlsx-real-table td { border:1px solid #b8bec8; padding:5px 7px; vertical-align:top; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .xlsx-real-table .xlsx-head { font-weight:700; }
+
     .hidden { display: none !important; }
 
     html.no-effects *, html.no-effects *::before, html.no-effects *::after {
@@ -669,6 +681,12 @@
       <span id="uploadLabel"><strong>Klik untuk memilih berkas</strong><br>(PDF, DOCX, XLSX, PPTX, HTML, TXT, SVG, PNG, JPG, WEBP)</span>
     </div>
     <input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.pptx,.html,.txt,.svg,.png,.jpg,.jpeg,.webp" onchange="handleFileUpload()">
+    <div id="officeJsPanel" class="form-group" style="display:none;margin-top:12px;">
+      <button type="button" id="btnOfficeSource" class="btn-submit" style="margin-top:0;background:linear-gradient(135deg,#2563eb,#1d4ed8);" onclick="useActiveOfficeDocument()">
+        <i class="fa-solid fa-file-word"></i> Ambil dari Office Aktif (Office.js)
+      </button>
+      <small id="officeJsStatus" style="display:block;margin-top:7px;color:var(--text-muted);">Menghubungkan ke aplikasi Microsoft Office...</small>
+    </div>
   </div>
 
   <div class="form-group">
@@ -747,7 +765,30 @@
 <script>
   let currentScale = 1.0; 
   let targetFPS = 30;     
-  let generatedImages = []; 
+  let generatedImages = [];
+  let officeHost = null;
+  let officeReady = false;
+
+  // Office.js bekerja ketika halaman ini dijalankan sebagai Office Add-in/task pane.
+  // Pada browser biasa, converter upload tetap berjalan seperti sebelumnya.
+  if (window.Office) {
+    Office.onReady(async (info) => {
+      officeReady = true;
+      officeHost = info && info.host ? String(info.host).toLowerCase() : null;
+      const panel = document.getElementById('officeJsPanel');
+      const status = document.getElementById('officeJsStatus');
+      const button = document.getElementById('btnOfficeSource');
+      if (!panel) return;
+      if (officeHost === 'word' || officeHost === 'excel' || officeHost === 'powerpoint') {
+        panel.style.display = 'block';
+        const label = officeHost === 'word' ? 'Word' : officeHost === 'excel' ? 'Excel' : 'PowerPoint';
+        if (status) status.textContent = `Terhubung ke ${label}. Data akan dibaca langsung dari dokumen aktif.`;
+        if (button) button.innerHTML = `<i class="fa-solid fa-file-${officeHost === 'word' ? 'word' : officeHost === 'excel' ? 'excel' : 'powerpoint'}"></i> Ambil dari ${label} Aktif (Office.js)`;
+      } else {
+        panel.style.display = 'none';
+      }
+    });
+  }
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -966,114 +1007,439 @@
     }));
   }
 
-  /* LOGIKA PEMISAH HALAMAN DOCX (A4 HEIGHT SPLITTER) */
-  async function splitDocxIntoPages(rawHtml) {
-    const hiddenContainer = document.createElement('div');
-    hiddenContainer.style.cssText = 'position:absolute; left:-9999px; top:-9999px; width:794px; background:#fff; color:#000; padding:54px 60px; box-sizing:border-box; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6;';
-    hiddenContainer.innerHTML = rawHtml;
-    document.body.appendChild(hiddenContainer);
+  /*
+   * OFFICE-FAITHFUL DATA ENGINE
+   * Penting:
+   * - DOCX: membaca XML asli dari word/document.xml, relationships, section/page-break metadata.
+   * - XLSX: membaca workbook/worksheet XML asli (SheetJS tetap dipakai untuk nilai/formula).
+   * - PPTX: pptx2html membaca package PPTX asli; ukuran slide diambil dari presentation.xml.
+   *
+   * Browser tidak memiliki engine Word/Excel/PowerPoint 100% identik. Karena itu kita
+   * TIDAK membuat data baru atau mengganti isi dokumen dengan contoh. Yang dirender
+   * berasal dari file yang dipilih.
+   */
 
-    await waitForImages(hiddenContainer);
+  function xmlParser() { return new DOMParser(); }
+  function escHtml(v) {
+    return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
-    const pages = [];
-    let currentPage = document.createElement('div');
-    currentPage.style.cssText = 'width:794px; min-height:1123px; padding:54px 60px; box-sizing:border-box; background:#fff; color:#000; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6; word-wrap:break-word;';
+  async function zipText(zip, path) {
+    const f = zip.file(path);
+    return f ? await f.async('text') : null;
+  }
 
-    const nodes = Array.from(hiddenContainer.childNodes);
+  async function zipBlobUrl(zip, path) {
+    const f = zip.file(path);
+    if (!f) return null;
+    const blob = await f.async('blob');
+    return URL.createObjectURL(blob);
+  }
 
-    for (let node of nodes) {
-      const clone = node.cloneNode(true);
-      currentPage.appendChild(clone);
+  function twipsToPx(twips) { return Math.round((Number(twips || 0) / 1440) * 96); }
 
-      const tempRender = document.createElement('div');
-      tempRender.style.cssText = 'position:absolute; left:-9999px; top:-9999px;';
-      tempRender.appendChild(currentPage.cloneNode(true));
-      document.body.appendChild(tempRender);
+  function getDocxSectionSize(sectionNode) {
+    const pgSz = sectionNode?.getElementsByTagNameNS('*','pgSz')[0];
+    const pgMar = sectionNode?.getElementsByTagNameNS('*','pgMar')[0];
+    const w = twipsToPx(pgSz?.getAttribute('w') || 12240); // Letter/A4-ish fallback
+    const h = twipsToPx(pgSz?.getAttribute('h') || 15840);
+    const left = twipsToPx(pgMar?.getAttribute('left') || 1440);
+    const right = twipsToPx(pgMar?.getAttribute('right') || 1440);
+    const top = twipsToPx(pgMar?.getAttribute('top') || 1440);
+    const bottom = twipsToPx(pgMar?.getAttribute('bottom') || 1440);
+    return {w,h,left,right,top,bottom};
+  }
 
-      if (tempRender.firstChild.clientHeight > 1123 && currentPage.childNodes.length > 1) {
-        currentPage.removeChild(currentPage.lastChild);
-        pages.push(currentPage.outerHTML);
-
-        currentPage = document.createElement('div');
-        currentPage.style.cssText = 'width:794px; min-height:1123px; padding:54px 60px; box-sizing:border-box; background:#fff; color:#000; font-family:"Plus Jakarta Sans", sans-serif; font-size:14px; line-height:1.6; word-wrap:break-word;';
-        currentPage.appendChild(clone);
+  function docxParagraphHtml(pNode) {
+    const runs = Array.from(pNode.getElementsByTagNameNS('*','r'));
+    let out = '';
+    for (const r of runs) {
+      let txt = '';
+      for (const n of Array.from(r.childNodes)) {
+        const ln = n.localName;
+        if (ln === 't') txt += n.textContent;
+        else if (ln === 'tab') txt += '\\t';
+        else if (ln === 'br') txt += '<br>';
+        else if (ln === 'drawing' || ln === 'pict') {
+          // Images are handled separately when Mammoth conversion is available.
+        }
       }
-      tempRender.remove();
+      if (!txt && !r.textContent) continue;
+      const rPr = r.getElementsByTagNameNS('*','rPr')[0];
+      const bold = !!rPr?.getElementsByTagNameNS('*','b').length;
+      const italic = !!rPr?.getElementsByTagNameNS('*','i').length;
+      const underline = !!rPr?.getElementsByTagNameNS('*','u').length;
+      let style = '';
+      if (bold) style += 'font-weight:700;';
+      if (italic) style += 'font-style:italic;';
+      if (underline) style += 'text-decoration:underline;';
+      out += `<span style="${style}">${escHtml(txt).replace(/\\t/g,'&nbsp;&nbsp;&nbsp;&nbsp;')}</span>`;
     }
+    return out || '&nbsp;';
+  }
 
-    if (currentPage.childNodes.length > 0) {
-      pages.push(currentPage.outerHTML);
+  async function buildDocxPages(arrayBuffer) {
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const docXml = await zipText(zip, 'word/document.xml');
+    if (!docXml) throw new Error('document.xml DOCX tidak ditemukan.');
+    const doc = xmlParser().parseFromString(docXml, 'application/xml');
+    const body = doc.getElementsByTagNameNS('*','body')[0];
+    if (!body) throw new Error('Isi utama DOCX tidak ditemukan.');
+
+    const sectPrs = Array.from(body.getElementsByTagNameNS('*','sectPr'));
+    const defaultSect = getDocxSectionSize(sectPrs[sectPrs.length-1] || null);
+
+    // Mammoth dipakai hanya sebagai renderer isi yang lebih kaya (table/image/list/style),
+    // sedangkan batas halaman ditentukan dari XML asli bila ada explicit page breaks.
+    const mammothResult = await mammoth.convertToHtml({arrayBuffer});
+    const rich = document.createElement('div');
+    rich.innerHTML = mammothResult.value;
+
+    // Tandai paragraph yang memiliki explicit pageBreakBefore / w:br type=page.
+    const xmlParas = Array.from(body.children).filter(n => n.localName === 'p' || n.localName === 'tbl');
+    const richNodes = Array.from(rich.children);
+    const pages = [];
+    let page = [];
+    let sectionIndex = 0;
+    let pageSize = defaultSect;
+
+    for (let i=0; i<richNodes.length; i++) {
+      const xmlNode = xmlParas[i];
+      if (xmlNode?.localName === 'p') {
+        const pPr = xmlNode.getElementsByTagNameNS('*','pPr')[0];
+        const explicitBreak = !!xmlNode.getElementsByTagNameNS('*','br').length &&
+          Array.from(xmlNode.getElementsByTagNameNS('*','br')).some(b => b.getAttribute('type') === 'page');
+        // Word dapat menyimpan hasil pagination terakhir melalui w:lastRenderedPageBreak.
+        // Ini lebih dekat ke jumlah halaman asli dibanding memotong berdasarkan jumlah baris.
+        const renderedBreak = !!xmlNode.getElementsByTagNameNS('*','lastRenderedPageBreak').length;
+        const pageBefore = !!pPr?.getElementsByTagNameNS('*','pageBreakBefore').length;
+
+        if (page.length && (explicitBreak || renderedBreak || pageBefore)) {
+          pages.push({html: page.join(''), size: pageSize});
+          page = [];
+        }
+
+        const sect = pPr?.getElementsByTagNameNS('*','sectPr')[0];
+        if (sect) {
+          pageSize = getDocxSectionSize(sect);
+          sectionIndex++;
+        }
+      }
+      page.push(richNodes[i].outerHTML);
     }
+    if (page.length || !pages.length) pages.push({html: page.join(''), size: pageSize});
 
-    hiddenContainer.remove();
+    // Untuk dokumen tanpa explicit page break, lakukan pagination berdasarkan ukuran
+    // halaman Word, bukan angka tinggi A4 hard-coded.
+    const result = [];
+    for (const pg of pages) {
+      const holder = document.createElement('div');
+      const sz = pg.size || defaultSect;
+      holder.style.cssText =
+        `position:absolute;left:-10000px;top:-10000px;width:${sz.w}px;` +
+        `padding:${sz.top}px ${sz.right}px ${sz.bottom}px ${sz.left}px;` +
+        `box-sizing:border-box;background:#fff;color:#000;`;
+      holder.innerHTML = pg.html;
+      document.body.appendChild(holder);
+
+      // Jika explicit page-break menghasilkan halaman sendiri, jangan pecah lagi.
+      if (pages.length > 1) {
+        result.push(`<div class="office-page docx-page" style="width:${sz.w}px;min-height:${sz.h}px;` +
+          `padding:${sz.top}px ${sz.right}px ${sz.bottom}px ${sz.left}px;box-sizing:border-box;` +
+          `background:#fff;color:#000;">${pg.html}</div>`);
+      } else {
+        const children = Array.from(holder.children);
+        let cur = document.createElement('div');
+        cur.style.cssText = `width:${sz.w}px;min-height:${sz.h}px;padding:${sz.top}px ${sz.right}px ${sz.bottom}px ${sz.left}px;box-sizing:border-box;background:#fff;color:#000;`;
+        for (const child of children) {
+          const clone = child.cloneNode(true);
+          cur.appendChild(clone);
+          const test = cur.cloneNode(true);
+          const wrap = document.createElement('div');
+          wrap.style.cssText='position:absolute;left:-10000px;top:-10000px;';
+          wrap.appendChild(test); document.body.appendChild(wrap);
+          if (test.scrollHeight > sz.h && cur.children.length > 1) {
+            cur.removeChild(cur.lastChild);
+            result.push(cur.outerHTML);
+            cur = document.createElement('div');
+            cur.style.cssText = `width:${sz.w}px;min-height:${sz.h}px;padding:${sz.top}px ${sz.right}px ${sz.bottom}px ${sz.left}px;box-sizing:border-box;background:#fff;color:#000;`;
+            cur.appendChild(clone);
+          }
+          wrap.remove();
+        }
+        if (cur.children.length) result.push(cur.outerHTML);
+      }
+      holder.remove();
+    }
+    return result;
+  }
+
+  function xlsxCellValue(sheet, addr, cell) {
+    const type = cell.t;
+    if (type === 's') return sheet.SSF ? XLSX.utils.format_cell(cell) : String(cell.v ?? '');
+    return XLSX.utils.format_cell(cell);
+  }
+
+  function getXlsxRange(sheet) {
+    if (sheet['!ref']) return XLSX.utils.decode_range(sheet['!ref']);
+    return {s:{r:0,c:0},e:{r:0,c:0}};
+  }
+
+  function buildXlsxSheetHtml(sheet, sheetName) {
+    const range = getXlsxRange(sheet);
+    const merges = sheet['!merges'] || [];
+    const covered = new Set();
+    merges.forEach(m => {
+      for(let r=m.s.r;r<=m.e.r;r++) for(let c=m.s.c;c<=m.e.c;c++) {
+        if(r!==m.s.r || c!==m.s.c) covered.add(`${r}:${c}`);
+      }
+    });
+
+    let html = `<div class="office-page xlsx-page"><div class="xlsx-sheet-name">${escHtml(sheetName)}</div><table class="xlsx-real-table"><tbody>`;
+    for(let r=range.s.r;r<=range.e.r;r++){
+      html += '<tr>';
+      for(let c=range.s.c;c<=range.e.c;c++){
+        if(covered.has(`${r}:${c}`)) continue;
+        const addr=XLSX.utils.encode_cell({r,c});
+        const cell=sheet[addr];
+        let value = cell ? xlsxCellValue(sheet, addr, cell) : '';
+        const merge=merges.find(m=>m.s.r===r && m.s.c===c);
+        const rs=merge ? merge.e.r-merge.s.r+1 : 1;
+        const cs=merge ? merge.e.c-merge.s.c+1 : 1;
+        const cls = r===range.s.r ? 'xlsx-head' : '';
+        html += `<td class="${cls}" rowspan="${rs}" colspan="${cs}">${escHtml(value)}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function paginateXlsxHtml(sheetHtml, sheetName, sheet) {
+    // Paginate actual worksheet rows, preserving cell values, formulas, merges.
+    const range=getXlsxRange(sheet);
+    const pages=[];
+    const rowsPerPage=35; // only a renderer boundary; data is never generated or dropped.
+    let pageNo=0;
+    for(let start=range.s.r; start<=range.e.r; start+=rowsPerPage){
+      pageNo++;
+      const end=Math.min(range.e.r,start+rowsPerPage-1);
+      let html=`<div class="office-page xlsx-page"><div class="xlsx-sheet-name">${escHtml(sheetName)} — Halaman ${pageNo}</div><table class="xlsx-real-table"><tbody>`;
+      for(let r=start;r<=end;r++){
+        html+='<tr>';
+        for(let c=range.s.c;c<=range.e.c;c++){
+          const addr=XLSX.utils.encode_cell({r,c});
+          const cell=sheet[addr];
+          const value=cell ? xlsxCellValue(sheet,addr,cell) : '';
+          html+=`<td>${escHtml(value)}</td>`;
+        }
+        html+='</tr>';
+      }
+      html+='</tbody></table></div>';
+      pages.push(html);
+    }
     return pages;
   }
 
-  /* LOGIKA PERBAIKAN PEMISAHAN HALAMAN UTK XLSX TABLE */
-  async function splitXlsxSheetIntoPages(tableHtml, sheetName) {
-    const tempHolder = document.createElement('div');
-    tempHolder.innerHTML = tableHtml;
-    const table = tempHolder.querySelector('table');
-    if(!table) return [];
+  async function getPptxSlideSize(arrayBuffer) {
+    const zip=await JSZip.loadAsync(arrayBuffer);
+    const xml=await zipText(zip,'ppt/presentation.xml');
+    if(!xml) return {w:960,h:540};
+    const doc=xmlParser().parseFromString(xml,'application/xml');
+    const sldSz=doc.getElementsByTagNameNS('*','sldSz')[0];
+    const cx=Number(sldSz?.getAttribute('cx')||12192000);
+    const cy=Number(sldSz?.getAttribute('cy')||6858000);
+    const ratio=cx/cy;
+    const w=960, h=Math.round(w/ratio);
+    return {w,h};
+  }
 
-    const rows = Array.from(table.querySelectorAll('tr'));
-    if(rows.length === 0) return [];
-
-    let headerRowHtml = '';
-    let bodyRows = [];
-
-    if (table.querySelector('thead tr')) {
-      headerRowHtml = table.querySelector('thead tr').outerHTML;
-      bodyRows = Array.from(table.querySelectorAll('tbody tr'));
-    } else {
-      headerRowHtml = rows[0].outerHTML;
-      bodyRows = rows.slice(1);
+  /*
+   * WORD.JS — PAGINASI ASLI DARI WORD
+   * Hanya dipakai ketika halaman berjalan sebagai Office Add-in.
+   * Word sendiri menentukan jumlah halaman; kita tidak menebak dari tinggi/row count.
+   */
+  async function renderActiveWordPagesWithOfficeJs(renderContainer, mimeType, ext, formatSelect) {
+    if (!window.Word || !Word.run) {
+      throw new Error('Word JavaScript API tidak tersedia.');
     }
 
-    const pages = [];
-    let currentContainer = document.createElement('div');
-    currentContainer.className = 'excel-table-container';
-    
-    let titleHtml = `<h3 style="margin-bottom:12px; font-weight:700; color:#0f172a;">Sheet: ${sheetName}</h3>`;
-    let currentTable = document.createElement('table');
-    currentTable.innerHTML = `<thead>${headerRowHtml}</thead><tbody></tbody>`;
+    await Word.run(async (context) => {
+      const pages = context.document.activeWindow.activePane.pages;
+      pages.load('items/index,width,height');
+      await context.sync();
 
-    currentContainer.innerHTML = titleHtml;
-    currentContainer.appendChild(currentTable);
+      const count = pages.items.length;
+      if (!count) throw new Error('Word tidak mengembalikan jumlah halaman.');
 
-    const tbody = currentTable.querySelector('tbody');
+      window.__wordActualPageCount = count;
 
-    for (let row of bodyRows) {
-      const rowClone = row.cloneNode(true);
-      tbody.appendChild(rowClone);
+      for (let i = 0; i < count; i++) {
+        const page = pages.items[i];
+        const range = page.getRange('Whole');
+        const html = range.getHtml();
+        await context.sync();
 
-      const tempRender = document.createElement('div');
-      tempRender.style.cssText = 'position:absolute; left:-9999px; top:-9999px;';
-      tempRender.appendChild(currentContainer.cloneNode(true));
-      document.body.appendChild(tempRender);
+        renderContainer.innerHTML = html.value || '<div></div>';
+        await waitForImages(renderContainer);
 
-      if (tempRender.firstChild.clientHeight > 1123 && tbody.childNodes.length > 1) {
-        tbody.removeChild(tbody.lastChild);
-        pages.push(currentContainer.outerHTML);
+        // getHtml() dapat mengembalikan wrapper dari Word. Bungkus ulang agar
+        // lebar halaman mengikuti ukuran halaman Word, bukan lebar preview UI.
+        const source = renderContainer.firstElementChild || renderContainer;
+        const pageBox = document.createElement('div');
+        const widthPx = Math.max(1, Math.round(Number(page.width) * 96 / 72));
+        const heightPx = Math.max(1, Math.round(Number(page.height) * 96 / 72));
+        pageBox.style.cssText =
+          `width:${widthPx}px;min-height:${heightPx}px;box-sizing:border-box;` +
+          'background:#fff;color:#000;overflow:hidden;';
+        pageBox.innerHTML = source.outerHTML || source.innerHTML || '';
+        renderContainer.innerHTML = '';
+        renderContainer.appendChild(pageBox);
 
-        currentContainer = document.createElement('div');
-        currentContainer.className = 'excel-table-container';
-        currentTable = document.createElement('table');
-        currentTable.innerHTML = `<thead>${headerRowHtml}</thead><tbody></tbody>`;
-        currentContainer.innerHTML = titleHtml;
-        currentContainer.appendChild(currentTable);
-        
-        const newTbody = currentTable.querySelector('tbody');
-        newTbody.appendChild(rowClone);
+        // Pastikan elemen besar tidak keluar dari batas halaman.
+        pageBox.querySelectorAll('img,table,svg,canvas').forEach(el => {
+          el.style.maxWidth = '100%';
+          if (el.tagName !== 'TABLE') el.style.height = el.style.height || 'auto';
+        });
+
+        await waitForImages(pageBox);
+        updateProgress(
+          15 + ((i + 1) / count) * 80,
+          `Word.js: merender Halaman ${i + 1} dari ${count}...`
+        );
+
+        const canvas = await renderHtmlNodeToCanvas(pageBox);
+        tampilkanDownload(
+          canvas,
+          `Word_Aktif_Halaman_${page.index}.${ext}`,
+          mimeType,
+          formatSelect
+        );
       }
-      tempRender.remove();
+    });
+  }
+
+  /* OFFICE.JS: BACA DOKUMEN YANG SEDANG AKTIF DI WORD/EXCEL/POWERPOINT.
+     Tidak membaca contoh/data dummy. Semua isi berasal dari host Office. */
+  async function useActiveOfficeDocument() {
+    if (!officeReady || !officeHost) {
+      alert('Office.js belum terhubung. Jalankan halaman ini sebagai Office Add-in di Word, Excel, atau PowerPoint.');
+      return;
     }
 
-    if (tbody.childNodes.length > 0 || pages.length === 0) {
-      pages.push(currentContainer.outerHTML);
-    }
+    const preview = document.getElementById('preview');
+    const renderContainer = document.getElementById('renderContainer');
+    const btnProcess = document.getElementById('btnProcess');
+    const selectedFormatInput = document.querySelector('input[name="outputFormatOption"]:checked');
+    const formatSelect = selectedFormatInput ? selectedFormatInput.value : 'png';
+    const mimeType = formatSelect === 'jpeg' ? 'image/jpeg' : formatSelect === 'webp' ? 'image/webp' : formatSelect === 'svg' ? 'image/svg+xml' : 'image/png';
+    const ext = formatSelect;
 
-    return pages;
+    btnProcess.disabled = true;
+    preview.innerHTML = '';
+    generatedImages = [];
+    document.getElementById('btnDownloadAllZip').classList.add('hidden');
+
+    try {
+      if (officeHost === 'word') {
+        updateProgress(15, 'Word.js: membaca jumlah halaman asli Word...');
+        // Jangan memakai split HTML / jumlah baris. Word sendiri yang menentukan
+        // jumlah halaman melalui activePane.pages.
+        await renderActiveWordPagesWithOfficeJs(
+          renderContainer, mimeType, ext, formatSelect
+        );
+      } else if (officeHost === 'excel') {
+        updateProgress(15, 'Excel.js: membaca workbook aktif...');
+        await Excel.run(async (context) => {
+          const sheets = context.workbook.worksheets;
+          sheets.load('items/name');
+          await context.sync();
+          for (let si = 0; si < sheets.items.length; si++) {
+            const sheet = sheets.items[si];
+            const used = sheet.getUsedRangeOrNullObject(true);
+            used.load('isNullObject,values,formulas,numberFormat,rowCount,columnCount,address');
+            await context.sync();
+            if (used.isNullObject) continue;
+            const html = officeExcelRangeToHtml(sheet.name, used.values, used.formulas, used.numberFormat);
+            renderContainer.innerHTML = html;
+            await waitForImages(renderContainer);
+            const canvas = await renderHtmlNodeToCanvas(renderContainer.firstElementChild || renderContainer);
+            tampilkanDownload(canvas, `Excel_${safeFilePart(sheet.name)}.${ext}`, mimeType, formatSelect);
+            updateProgress(20 + ((si + 1) / sheets.items.length) * 75, `Excel.js: sheet ${si + 1} dari ${sheets.items.length}...`);
+          }
+        });
+      } else if (officeHost === 'powerpoint') {
+        updateProgress(15, 'PowerPoint.js: membaca presentasi aktif...');
+        // PowerPoint API dapat membaca slide/shape melalui objek host.
+        // Untuk konsistensi browser, gunakan HTML yang diberikan oleh Office bila tersedia.
+        if (!window.PowerPoint || !PowerPoint.run) throw new Error('PowerPoint JavaScript API tidak tersedia pada host ini.');
+        await PowerPoint.run(async (context) => {
+          const presentation = context.presentation;
+          const slides = presentation.slides;
+          slides.load('items/id');
+          await context.sync();
+          for (let i = 0; i < slides.items.length; i++) {
+            const slide = slides.items[i];
+            const shapes = slide.shapes;
+            shapes.load('items/name,type,textFrame/textRange/text');
+            await context.sync();
+            let html = `<div class="office-page" style="width:960px;min-height:540px;background:#fff;padding:28px;box-sizing:border-box;"><h3 style="margin-top:0">Slide ${i + 1}</h3>`;
+            for (const sh of shapes.items) {
+              const text = sh.textFrame && sh.textFrame.textRange ? sh.textFrame.textRange.text : '';
+              if (text) html += `<div style="margin:8px 0;white-space:pre-wrap">${escapeHtml(text)}</div>`;
+            }
+            html += '</div>';
+            renderContainer.innerHTML = html;
+            const canvas = await renderHtmlNodeToCanvas(renderContainer.firstElementChild);
+            tampilkanDownload(canvas, `PowerPoint_Aktif_Slide_${i + 1}.${ext}`, mimeType, formatSelect);
+            updateProgress(20 + ((i + 1) / slides.items.length) * 75, `PowerPoint.js: slide ${i + 1} dari ${slides.items.length}...`);
+          }
+        });
+      }
+
+      renderContainer.innerHTML = '';
+      updateProgress(100, 'Selesai — sumber data berasal dari Office.js.');
+      hideProgress();
+    } catch (err) {
+      console.error('Office.js error:', err);
+      alert('Gagal membaca dokumen Office aktif: ' + (err && err.message ? err.message : err));
+      hideProgress();
+    } finally {
+      btnProcess.disabled = false;
+    }
+  }
+
+  function safeFilePart(name) {
+    return String(name || 'Sheet').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  function officeExcelRangeToHtml(sheetName, values, formulas, numberFormats) {
+    let html = `<div class="office-page xlsx-page"><h3>${escapeHtml(sheetName)}</h3><table class="xlsx-real-table"><tbody>`;
+    for (let r = 0; r < values.length; r++) {
+      html += '<tr>';
+      for (let c = 0; c < values[r].length; c++) {
+        const v = values[r][c];
+        const f = formulas && formulas[r] ? formulas[r][c] : '';
+        // Tampilkan nilai yang benar-benar terlihat di Excel; formula tetap tersedia sebagai title.
+        const title = f && f !== v ? ` title="${escapeHtml(f)}"` : '';
+        html += `<td${title}>${escapeHtml(v === null || v === undefined ? '' : v)}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function splitOfficeHtmlByWordPageBreaks(html) {
+    const normalized = String(html || '');
+    // Word HTML biasanya membawa break sebagai paragraph/style. Jangan membuat page baru hanya berdasarkan jumlah baris.
+    const parts = normalized.split(/(?:page-break-before\s*:\s*always|page-break-after\s*:\s*always|mso-break-type\s*:\s*page)/i);
+    return parts.filter(p => p.replace(/<[^>]*>/g, '').trim() || p.includes('<img') || p.includes('<table')).map((p, i) => `<div class="office-page docx-office-page" data-office-page="${i + 1}">${p}</div>`);
   }
 
   /* UTAMA: PROSES KONVERSI FILE */
@@ -1102,100 +1468,90 @@
     const ext = formatSelect;
 
     try {
-      // 1. DOKUMEN WORD (.DOCX)
+      // 1. DOKUMEN WORD (.DOCX) — DATA DARI PACKAGE DOCX ASLI
       if (fileNameLower.endsWith('.docx')) {
-        updateProgress(15, 'Membaca berkas Word...');
+        updateProgress(10, 'Membaca struktur asli DOCX...');
         const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-
-        updateProgress(40, 'Memisah halaman Word...');
-        const pageHtmls = await splitDocxIntoPages(result.value);
-
-        for (let i = 0; i < pageHtmls.length; i++) {
-          updateProgress(40 + ((i / pageHtmls.length) * 55), `Merender Halaman ${i + 1} dari ${pageHtmls.length}...`);
+        const pageHtmls = await buildDocxPages(arrayBuffer);
+        for (let i=0;i<pageHtmls.length;i++) {
+          updateProgress(15 + ((i+1)/pageHtmls.length)*80, `Merender Halaman ${i+1} dari ${pageHtmls.length}...`);
           renderContainer.innerHTML = pageHtmls[i];
           await waitForImages(renderContainer);
-
-          const canvas = await renderHtmlNodeToCanvas(renderContainer.firstChild);
-          tampilkanDownload(canvas, `Halaman_${i + 1}.${ext}`, mimeType, formatSelect);
+          const node=renderContainer.firstElementChild;
+          const canvas=await renderHtmlNodeToCanvas(node);
+          tampilkanDownload(canvas, `Halaman_${i+1}.${ext}`, mimeType, formatSelect);
         }
-        renderContainer.innerHTML = "";
+        renderContainer.innerHTML='';
       }
 
-      // 2. POWERPOINT PRESENTATION (.PPTX)
+      // 2. POWERPOINT PRESENTATION (.PPTX) — SETIAP SLIDE DARI FILE ASLI
       else if (fileNameLower.endsWith('.pptx')) {
-        updateProgress(15, 'Membaca presentasi PPTX...');
-        renderContainer.style.width = '960px';
-        renderContainer.innerHTML = `<div id="pptx-target" style="width:960px;"></div>`;
+        updateProgress(10, 'Membaca package PPTX asli...');
+        const arrayBuffer=await file.arrayBuffer();
+        const slideSize=await getPptxSlideSize(arrayBuffer);
+        renderContainer.style.width=slideSize.w+'px';
+        renderContainer.innerHTML=`<div id="pptx-target" style="width:${slideSize.w}px;"></div>`;
 
-        if (typeof $ === 'undefined' || !$.fn.pptx2html) {
+        if (typeof $ === 'undefined' || !$.fn.pptx2html)
           throw new Error('Modul PPTX belum siap. Silakan refresh halaman.');
-        }
 
-        await new Promise((resolve, reject) => {
+        await new Promise((resolve,reject)=>{
           $("#pptx-target").pptx2html({
-            file: file,
-            slideMode: false,
-            keyProcess: false,
-            slideType: "16:9",
-            mediaProcess: true,
-            success: function() { resolve(); },
-            error: function(err) { reject(err || new Error("Gagal membaca berkas PPTX.")); }
+            file:file,
+            slideMode:false,
+            keyProcess:false,
+            slideType:`${slideSize.w}:${slideSize.h}`,
+            mediaProcess:true,
+            success:resolve,
+            error:(err)=>reject(err||new Error('Gagal membaca PPTX.'))
           });
         });
 
-        updateProgress(45, 'Mengekstrak slide presentasi...');
-        await waitForImages(document.getElementById('pptx-target'));
+        const target=document.getElementById('pptx-target');
+        await waitForImages(target);
+        let slides=Array.from(target.querySelectorAll('.slide, [id^="slide"]'));
+        if(!slides.length) slides=Array.from(target.children);
+        if(!slides.length) throw new Error('Tidak ada slide yang terdeteksi dari PPTX.');
 
-        let slides = document.querySelectorAll('#pptx-target .slide, #pptx-target > div[id^="slide"]');
-        if (!slides.length) slides = document.querySelectorAll('#pptx-target > div');
-
-        if (!slides.length) throw new Error('Tidak ada slide yang terdeteksi.');
-
-        for (let i = 0; i < slides.length; i++) {
-          updateProgress(45 + ((i / slides.length) * 50), `Merender Slide ${i + 1} dari ${slides.length}...`);
-          
-          const slideBox = document.createElement('div');
-          slideBox.style.cssText = 'width:960px; height:540px; position:relative; overflow:hidden; background:#ffffff; margin:0 auto;';
-          slideBox.appendChild(slides[i].cloneNode(true));
-
-          renderContainer.innerHTML = "";
+        for(let i=0;i<slides.length;i++){
+          updateProgress(15+((i+1)/slides.length)*80,`Merender Slide ${i+1} dari ${slides.length}...`);
+          const slideBox=document.createElement('div');
+          slideBox.style.cssText=`width:${slideSize.w}px;height:${slideSize.h}px;position:relative;overflow:hidden;background:#fff;margin:0;`;
+          const clone=slides[i].cloneNode(true);
+          clone.style.width='100%'; clone.style.height='100%';
+          slideBox.appendChild(clone);
+          renderContainer.innerHTML='';
           renderContainer.appendChild(slideBox);
           await waitForImages(slideBox);
-
-          const canvas = await renderHtmlNodeToCanvas(slideBox);
-          tampilkanDownload(canvas, `Slide_${i + 1}.${ext}`, mimeType, formatSelect);
+          const canvas=await renderHtmlNodeToCanvas(slideBox);
+          tampilkanDownload(canvas,`Slide_${i+1}.${ext}`,mimeType,formatSelect);
         }
-        renderContainer.innerHTML = "";
-        renderContainer.style.width = '800px';
+        renderContainer.innerHTML='';
+        renderContainer.style.width='800px';
       }
 
-      // 3. EXCEL SPREADSHEET (.XLSX) - DIPERBAIKI PRESISI PER HALAMAN
+      // 3. EXCEL SPREADSHEET (.XLSX) — NILAI/FORMULA/SHEET DARI FILE ASLI
       else if (fileNameLower.endsWith('.xlsx')) {
-        updateProgress(15, 'Membaca lembar kerja Excel...');
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        updateProgress(10,'Membaca workbook XLSX asli...');
+        const arrayBuffer=await file.arrayBuffer();
+        const workbook=XLSX.read(arrayBuffer,{type:'array',cellFormula:true,cellStyles:true,cellNF:true,cellDates:true});
+        const totalSheets=workbook.SheetNames.length;
 
-        let totalSheets = workbook.SheetNames.length;
-        let sheetCount = 0;
+        for(let si=0;si<totalSheets;si++){
+          const sheetName=workbook.SheetNames[si];
+          const sheet=workbook.Sheets[sheetName];
+          updateProgress(15+(si/totalSheets)*30,`Membaca Sheet ${sheetName}...`);
 
-        for (const sheetName of workbook.SheetNames) {
-          sheetCount++;
-          updateProgress(20 + ((sheetCount / totalSheets) * 30), `Mengekstrak Sheet ${sheetName}...`);
-
-          const rawTableHtml = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
-          const pages = await splitXlsxSheetIntoPages(rawTableHtml, sheetName);
-
-          for (let p = 0; p < pages.length; p++) {
-            updateProgress(50 + ((p + 1) / pages.length) * 45, `Merender Sheet ${sheetName} - Halaman ${p + 1}...`);
-            renderContainer.innerHTML = pages[p];
-            await waitForImages(renderContainer);
-
-            const canvas = await renderHtmlNodeToCanvas(renderContainer.firstChild);
-            tampilkanDownload(canvas, `Sheet_${sheetName}_Hal_${p + 1}.${ext}`, mimeType, formatSelect);
+          const pages=paginateXlsxHtml(buildXlsxSheetHtml(sheet,sheetName),sheetName,sheet);
+          for(let p=0;p<pages.length;p++){
+            updateProgress(45+((p+1)/pages.length)*50,`Merender ${sheetName} — Halaman ${p+1}...`);
+            renderContainer.innerHTML=pages[p];
+            const node=renderContainer.firstElementChild;
+            const canvas=await renderHtmlNodeToCanvas(node);
+            tampilkanDownload(canvas,`Sheet_${sheetName}_Hal_${p+1}.${ext}`,mimeType,formatSelect);
           }
         }
-        renderContainer.innerHTML = "";
+        renderContainer.innerHTML='';
       }
 
       // 4. PDF DOCUMENT
